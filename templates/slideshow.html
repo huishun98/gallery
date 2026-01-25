@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Dynamic Slideshow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes danmu-fly {
+            0% {
+                transform: translate3d(110vw, 0, 0);
+            }
+
+            100% {
+                transform: translate3d(-120vw, 0, 0);
+            }
+        }
+
+        .danmu-item {
+            position: absolute;
+            white-space: nowrap;
+            color: #ffffff;
+            text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            animation-name: danmu-fly;
+            animation-timing-function: linear;
+            animation-fill-mode: forwards;
+            pointer-events: none;
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+</head>
+
+<body class="bg-black overflow-hidden">
+    <!-- Slideshow container -->
+    <div class="relative w-screen h-screen">
+
+        <!-- Media content -->
+        <div id="content" class="absolute inset-0 flex items-center justify-center">
+            <!-- image / video injected here -->
+        </div>
+
+        {{if .DanmuEnabled}}
+        <!-- Danmu overlay -->
+        <div id="danmu" class="absolute inset-0 overflow-hidden pointer-events-none"></div>
+        {{end}}
+
+        <!-- QR code overlay -->
+        <img id="qr" src="/qr" alt="QR Code"
+            class="absolute bottom-6 right-6 w-40 h-40 bg-white rounded-lg shadow-lg opacity-90" />
+    </div>
+
+    <script>
+        const danmuEnabled = document.getElementById('danmu');
+
+        let media = [];
+        let index = 0;
+        let currentDanmuFile = '';
+
+        async function loadMedia() {
+            const res = await fetch('/media');
+            const data = await res.json();
+            media = Array.isArray(data.items) ? data.items : [];
+        }
+
+        async function loadComments(filename) {
+            const res = await fetch(`/comments?filename=${encodeURIComponent(filename)}`);
+            const data = await res.json();
+            return Array.isArray(data.comments) ? data.comments : [];
+        }
+
+        function spawnDanmu(text) {
+            const item = document.createElement('div');
+            item.className = 'danmu-item';
+            item.textContent = text;
+
+            const top = Math.random() * 40; // keep within top 40%
+            const size = 18 + Math.random() * 10;
+            const duration = 10 + Math.random() * 12;
+
+            item.style.top = `${top}%`;
+            item.style.fontSize = `${size}px`;
+            item.style.animationDuration = `${duration}s`;
+
+            danmuEnabled.appendChild(item);
+            item.addEventListener("animationend", () => {
+                item.remove();
+            });
+        }
+
+        async function startDanmu(filename) {
+            const comments = await loadComments(filename);
+            comments.forEach(c => spawnDanmu(c.comment));
+        }
+
+        function showNext() {
+            if (media.length === 0) return;
+
+            const nextUrl = media[(index + 1) % media.length];
+            preloadNext(nextUrl); // <-- preload next
+
+            const url = media[index % media.length];
+
+            const ext = url.split('.').pop().toLowerCase();
+            const container = document.getElementById('content');
+            container.innerHTML = '';
+            const filename = decodeURIComponent(url.split('/').pop() || url);
+
+            // If file changed, start danmu for new file
+            if (danmuEnabled && filename !== currentDanmuFile) {
+                currentDanmuFile = filename;
+                startDanmu(filename);
+            }
+
+            if (ext === 'mp4' || ext === 'webm' || ext === 'mov') {
+                const video = document.createElement('video');
+                video.src = url;
+                video.autoplay = true;
+                video.muted = true;
+                video.playsInline = true;
+                video.className = 'max-w-full max-h-full';
+
+                const fallback = setTimeout(() => {
+                    video.pause();
+                    index++;
+                    showNext();
+                }, 30000);
+
+                video.onended = () => {
+                    clearTimeout(fallback);
+                    index++;
+                    showNext();
+                };
+
+                container.appendChild(video);
+            } else {
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = 'max-w-full max-h-full';
+
+                container.appendChild(img);
+
+                setTimeout(() => {
+                    index++;
+                    showNext();
+                }, 4000);
+            }
+        }
+
+        function preloadNext(url) {
+            const ext = url.split('.').pop().toLowerCase();
+            if (ext === 'mp4' || ext === 'webm' || ext === 'mov') {
+                const v = document.createElement('video');
+                v.src = url;
+                v.preload = 'auto';
+            } else {
+                const img = new Image();
+                img.src = url;
+            }
+        }
+
+        async function start() {
+            await loadMedia();
+            showNext();
+
+            // Reload media list every 10 seconds
+            setInterval(loadMedia, 10000);
+
+            // Refresh QR code periodically
+            setInterval(() => {
+                document.getElementById('qr').src = '/qr?ts=' + Date.now();
+            }, 10000);
+        }
+
+        start();
+    </script>
+</body>
+
+</html>

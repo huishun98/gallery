@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Comments</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen bg-gray-50 flex items-start md:items-center justify-center">
+    <div class="bg-white md:shadow-lg rounded-xl p-8 w-full max-w-2xl">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">Delete comments</h2>
+                <p class="text-sm text-gray-500 mb-6">Review recent comments and remove unwanted entries.</p>
+            </div>
+            <a href="/admin" class="text-xs text-blue-600 hover:underline">Manage photos</a>
+        </div>
+
+        <div class="flex flex-col gap-2 text-xs text-gray-600 md:flex-row md:items-center md:justify-between">
+            <div id="status">Loading comments...</div>
+            <div id="paginationTop" class="flex items-center gap-2">
+                <button id="prevBtnTop" type="button"
+                    class="px-3 py-1 rounded border border-gray-200 hover:border-gray-400">Prev</button>
+                <div id="pageInfoTop"></div>
+                <button id="nextBtnTop" type="button"
+                    class="px-3 py-1 rounded border border-gray-200 hover:border-gray-400">Next</button>
+            </div>
+        </div>
+
+        <div id="results" class="mt-6 space-y-3"></div>
+
+        <div class="mt-6 flex flex-col gap-3 text-xs text-gray-600 md:flex-row md:items-center md:justify-between">
+            <button id="downloadCsvBtn" type="button"
+                class="w-full md:w-auto px-3 py-2 rounded border border-gray-200 text-gray-700 hover:border-gray-400">
+                Download CSV
+            </button>
+            <div id="paginationBottom" class="flex items-center justify-between md:justify-end gap-2">
+                <button id="prevBtnBottom" type="button"
+                    class="px-3 py-1 rounded border border-gray-200 hover:border-gray-400">Prev</button>
+                <div id="pageInfoBottom"></div>
+                <button id="nextBtnBottom" type="button"
+                    class="px-3 py-1 rounded border border-gray-200 hover:border-gray-400">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const status = document.getElementById("status");
+        const results = document.getElementById("results");
+        const paginationTop = document.getElementById("paginationTop");
+        const paginationBottom = document.getElementById("paginationBottom");
+        const downloadCsvBtn = document.getElementById("downloadCsvBtn");
+        const prevBtnTop = document.getElementById("prevBtnTop");
+        const nextBtnTop = document.getElementById("nextBtnTop");
+        const pageInfoTop = document.getElementById("pageInfoTop");
+        const prevBtnBottom = document.getElementById("prevBtnBottom");
+        const nextBtnBottom = document.getElementById("nextBtnBottom");
+        const pageInfoBottom = document.getElementById("pageInfoBottom");
+
+        let currentPage = 1;
+        const pageSize = 10;
+        let totalPages = 1;
+
+        const renderComments = (payload) => {
+            results.innerHTML = "";
+
+            if (!payload || !payload.comments || payload.comments.length === 0) {
+                status.innerText = "No comments yet.";
+                paginationTop.classList.add("hidden");
+                paginationBottom.classList.add("hidden");
+                return;
+            }
+
+            paginationTop.classList.remove("hidden");
+            paginationBottom.classList.remove("hidden");
+            totalPages = Math.max(1, Math.ceil((payload.total || 0) / pageSize));
+            pageInfoTop.innerText = `Page ${payload.page} of ${totalPages}`;
+            pageInfoBottom.innerText = `Page ${payload.page} of ${totalPages}`;
+            prevBtnTop.disabled = payload.page <= 1;
+            nextBtnTop.disabled = payload.page >= totalPages;
+            prevBtnBottom.disabled = payload.page <= 1;
+            nextBtnBottom.disabled = payload.page >= totalPages;
+            prevBtnTop.classList.toggle("opacity-50", prevBtnTop.disabled);
+            nextBtnTop.classList.toggle("opacity-50", nextBtnTop.disabled);
+            prevBtnBottom.classList.toggle("opacity-50", prevBtnBottom.disabled);
+            nextBtnBottom.classList.toggle("opacity-50", nextBtnBottom.disabled);
+            status.innerText = `Showing ${payload.count} of ${payload.total} comment(s).`;
+
+            const isVideoFile = (filename) => {
+                return /\.(mp4|webm|mov)$/i.test(filename || "");
+            };
+
+            payload.comments.forEach((comment) => {
+                const card = document.createElement("div");
+                card.className = "border border-gray-200 rounded-lg overflow-hidden flex flex-col md:flex-row md:items-stretch md:justify-between";
+
+                const preview = document.createElement("a");
+                const encodedName = encodeURIComponent(comment.filename);
+                preview.href = `/mediafiles/${encodedName}`;
+                preview.target = "_blank";
+                preview.rel = "noopener";
+                preview.className = "w-full md:w-28 h-28 md:h-auto overflow-hidden bg-gray-50 border-b border-gray-100 md:border-b-0 md:border-r flex items-center justify-center";
+
+                if (isVideoFile(comment.filename)) {
+                    preview.innerHTML = `
+                        <video src="/mediafiles/${encodedName}" class="w-full h-full object-cover" muted playsinline></video>
+                    `;
+                } else {
+                    preview.innerHTML = `
+                        <img src="/mediafiles/${encodedName}" alt="" class="w-full h-full object-cover" />
+                    `;
+                }
+
+                const meta = document.createElement("div");
+                meta.className = "flex-1";
+                meta.innerHTML = `
+                    <div class="text-xs text-gray-400">ID ${comment.id} • ${comment.created_at}</div>
+                    <a class="text-xs text-blue-600 hover:underline" href="/mediafiles/${encodeURIComponent(comment.filename)}" target="_blank" rel="noopener">
+                        ${comment.filename}
+                    </a>
+                    <div class="text-sm text-gray-800 mt-2 whitespace-pre-wrap">${comment.comment}</div>
+                `;
+
+                const actions = document.createElement("div");
+                actions.className = "flex items-center gap-2";
+
+                const deleteBtn = document.createElement("button");
+                deleteBtn.type = "button";
+                deleteBtn.className = "text-xs text-red-600 border border-red-200 px-3 py-1.5 rounded hover:border-red-400 hover:text-red-700";
+                deleteBtn.innerText = "Delete";
+
+                deleteBtn.addEventListener("click", async () => {
+                    const confirmed = window.confirm("Delete this comment?");
+                    if (!confirmed) return;
+
+                    const formData = new FormData();
+                    formData.append("id", comment.id);
+
+                    try {
+                        const res = await fetch("/admin/comments/delete", {
+                            method: "POST",
+                            body: formData,
+                        });
+
+                        if (!res.ok) {
+                            throw new Error("delete failed");
+                        }
+
+                        card.remove();
+                        const remaining = results.querySelectorAll("div.border").length;
+                        if (remaining === 0 && payload.total > 1 && currentPage > 1) {
+                            currentPage -= 1;
+                            await fetchComments();
+                            return;
+                        }
+                        status.innerText = remaining
+                            ? `Showing ${remaining} comment(s) on this page.`
+                            : "No comments on this page.";
+                    } catch (err) {
+                        status.className = "text-xs text-red-600 mt-4";
+                        status.innerText = "Failed to delete comment.";
+                    }
+                });
+
+                actions.appendChild(deleteBtn);
+
+                const content = document.createElement("div");
+                content.className = "flex-1 p-4";
+                content.appendChild(meta);
+
+                const actionsWrap = document.createElement("div");
+                actionsWrap.className = "p-4 pt-0 md:pt-4";
+                actionsWrap.appendChild(actions);
+
+                card.appendChild(preview);
+                card.appendChild(content);
+                card.appendChild(actionsWrap);
+                results.appendChild(card);
+            });
+        };
+
+        const fetchComments = async () => {
+            status.className = "text-xs text-gray-500";
+            status.innerText = "Loading comments...";
+            results.innerHTML = "";
+            try {
+                const res = await fetch(`/comments?page=${currentPage}&size=${pageSize}`);
+                if (!res.ok) {
+                    throw new Error("request failed");
+                }
+                const payload = await res.json();
+                renderComments(payload);
+            } catch (err) {
+                status.className = "text-xs text-red-600";
+                status.innerText = "Unable to load comments.";
+            }
+        };
+
+        const goPrev = () => {
+            if (currentPage > 1) {
+                currentPage -= 1;
+                fetchComments();
+            }
+        };
+
+        const goNext = () => {
+            if (currentPage < totalPages) {
+                currentPage += 1;
+                fetchComments();
+            }
+        };
+
+        prevBtnTop.addEventListener("click", goPrev);
+        prevBtnBottom.addEventListener("click", goPrev);
+        nextBtnTop.addEventListener("click", goNext);
+        nextBtnBottom.addEventListener("click", goNext);
+
+        downloadCsvBtn.addEventListener("click", async () => {
+            try {
+                const res = await fetch("/admin/comments/download");
+                if (!res.ok) {
+                    throw new Error("download failed");
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "comments.csv";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                status.className = "text-xs text-red-600";
+                status.innerText = "Failed to download CSV.";
+            }
+        });
+
+        fetchComments();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,47 @@
+name: Build and Publish Docker Image
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/gallery:${{ github.ref_name }} .
+          docker tag ghcr.io/${{ github.repository }}/gallery:${{ github.ref_name }} \
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/gallery:${{ github.ref_name }}
+
+      - name: Push to GHCR
+        run: |
+          docker push ghcr.io/${{ github.repository }}/gallery:${{ github.ref_name }}
+
+      - name: Push to Docker Hub
+        run: |
+          docker push docker.io/${{ secrets.DOCKERHUB_USERNAME }}/gallery:${{ github.ref_name }}

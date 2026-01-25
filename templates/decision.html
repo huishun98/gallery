@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Review</title>
+    <style>
+        .glass-btn, .glass-btn:active {
+            padding: 18px 24px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s ease, background 0.2s ease, border 0.2s ease;
+            cursor: pointer;
+        }
+
+        .glass-btn.approve {
+            background: rgba(30, 180, 90, 0.25);
+            border-color: rgba(30, 180, 90, 0.35);
+        }
+
+        .glass-btn.approve:hover {
+            background: rgba(30, 180, 90, 0.20);
+        }
+
+        .glass-btn.reject {
+            background: rgba(220, 40, 60, 0.25);
+            border-color: rgba(220, 40, 60, 0.35);
+        }
+        .glass-btn.reject:hover {
+            background: rgba(220, 40, 60, 0.20);
+        }
+
+        .glass-btn:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-black text-white">
+    <div class="relative w-screen h-screen">
+        <div id="content" class="absolute inset-0 flex flex-col items-center justify-center gap-6">
+            <!-- media injected here -->
+        </div>
+
+        <div id="actions" class="absolute bottom-32 left-0 right-0 flex justify-center gap-8">
+            <button id="rejectBtn" class="glass-btn rounded-full reject">✗</button>
+            <button id="approveBtn" class="glass-btn rounded-full approve">✓</button>
+        </div>
+
+        {{if .DanmuEnabled}}
+        <a href="/admin/comments" class="absolute top-6 right-6 text-xs text-white/80 hover:text-white underline">
+            Manage comments
+        </a>
+        {{end}}
+
+    </div>
+
+    <script>
+        let currentMedia = null;
+        const actions = document.getElementById('actions');
+        const content = document.getElementById('content');
+
+        async function loadMedia() {
+            const res = await fetch('/admin/pending');
+
+            if (!res.ok || res.status === 204) {
+                currentMedia = null;
+                content.innerHTML = '<p>No pending media</p>';
+                actions.classList.add('hidden');
+                return;
+            }
+
+            currentMedia = await res.json();
+            actions.classList.remove('hidden');
+            renderMedia(currentMedia);
+        }
+
+        function renderMedia(media) {
+            const content = document.getElementById('content');
+            content.innerHTML = '';
+
+            if (media.type === 'image') {
+                const img = document.createElement('img');
+                img.src = media.url;
+                img.className = 'max-h-[80vh] max-w-[90vw] object-contain';
+                content.appendChild(img);
+            }
+
+            if (media.type === 'video') {
+                const video = document.createElement('video');
+                video.src = media.url;
+                video.controls = true;
+                video.autoplay = true;
+                video.className = 'max-h-[80vh] max-w-[90vw]';
+                content.appendChild(video);
+            }
+        }
+
+        async function action(path) {
+            if (!currentMedia) return;
+
+            await fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: currentMedia.path })
+            });
+
+            await loadMedia();
+        }
+
+        document.getElementById('approveBtn').onclick = () => action('/admin/media/approve');
+        document.getElementById('rejectBtn').onclick = () => action('/admin/media/reject');
+
+        loadMedia();
+    </script>
+</body>
+
+</html>

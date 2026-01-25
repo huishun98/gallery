@@ -1,0 +1,98 @@
+name: Build & Release (DMG + Windows ZIP)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build Windows ZIP
+        run: ./scripts/build-windows.sh
+
+      - name: Upload Windows ZIP as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gallery-windows-x64.zip
+          path: Gallery-windows-x64.zip
+
+  macos:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: amd64
+            dmg: Gallery-macos-x64.dmg
+          - os: macos-latest
+            arch: arm64
+            dmg: Gallery-macos-arm64.dmg
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install build dependencies
+        run: brew install cloudflared
+
+      - name: Build DMG
+        run: ./scripts/build-darwin.sh "${{ matrix.arch }}" "${{ matrix.dmg }}"
+
+      - name: Upload DMG as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.dmg }}
+          path: ${{ matrix.dmg }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [windows, macos]
+    steps:
+      - name: Download Gallery-windows-x64.zip
+        uses: actions/download-artifact@v4
+        with:
+          name: Gallery-windows-x64.zip
+          path: .
+
+      - name: Download Gallery-macos-x64.dmg
+        uses: actions/download-artifact@v4
+        with:
+          name: Gallery-macos-x64.dmg
+          path: .
+
+      - name: Download Gallery-macos-arm64.dmg
+        uses: actions/download-artifact@v4
+        with:
+          name: Gallery-macos-arm64.dmg
+          path: .
+
+      - name: Publish release (DMG + Windows ZIP)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            Gallery-macos-x64.dmg
+            Gallery-macos-arm64.dmg
+            Gallery-windows-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
