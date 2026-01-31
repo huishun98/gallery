@@ -8,23 +8,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(r *gin.Engine, db *sql.DB, dataDir string, adminAccount gin.Accounts, danmuEnabled bool) {
+func SetupRoutes(r *gin.Engine, db *sql.DB, dataDir string, adminAccount gin.Accounts, approvalsEnabled, danmuEnabled bool) {
 	mediaDir := filepath.Join(dataDir, "media")
 	uploadDir := filepath.Join(mediaDir, "media")
-	templateData := gin.H{"DanmuEnabled": danmuEnabled}
+	templateData := gin.H{"DanmuEnabled": danmuEnabled, "ApprovalsEnabled": approvalsEnabled}
 
-	if adminAccount != nil {
-		admin := r.Group("/admin", gin.BasicAuth(adminAccount))
-		admin.GET("/", handlers.Page("decision.html", templateData))
-		admin.GET("/pending", handlers.Pending(filepath.Join(mediaDir, "pending")))
+	var admin *gin.RouterGroup
+	if approvalsEnabled || danmuEnabled {
+		admin = r.Group("/admin", gin.BasicAuth(adminAccount))
+	}
+
+	if approvalsEnabled {
+		admin.GET("/review", handlers.Page("decision.html", templateData))
+		admin.GET("/media/pending", handlers.Pending(filepath.Join(mediaDir, "pending")))
 		admin.POST("/media/approve", handlers.MoveMedia(filepath.Join(mediaDir, "pending"), filepath.Join(mediaDir, "media")))
 		admin.POST("/media/reject", handlers.MoveMedia(filepath.Join(mediaDir, "pending"), filepath.Join(mediaDir, "rejected")))
-
-		if danmuEnabled {
-			admin.GET("/comments", handlers.Page("comments.html", templateData))
-			admin.POST("/comments/delete", handlers.DeleteComment(db))
-			admin.GET("/comments/download", handlers.DownloadComments(db))
-		}
 
 		uploadDir = filepath.Join(mediaDir, "pending")
 	}
@@ -36,6 +34,10 @@ func SetupRoutes(r *gin.Engine, db *sql.DB, dataDir string, adminAccount gin.Acc
 	r.GET("/qr", handlers.QR)
 
 	if danmuEnabled {
+		admin.GET("/comments", handlers.Page("comments.html", templateData))
+		admin.POST("/comments/delete", handlers.DeleteComment(db))
+		admin.GET("/comments/download", handlers.DownloadComments(db))
+
 		r.GET("/comments", handlers.GetComments(db))
 		r.POST("/comment", handlers.SaveComment(db))
 	}

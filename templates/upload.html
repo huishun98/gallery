@@ -30,8 +30,10 @@
 
         <!-- Success state -->
         <div id="successState" class="hidden text-center">
-            <p class="text-xs text-gray-500 text-center mb-4">File uploaded successfully. It will be added to the slideshow once approved.</p>
-            <button id="uploadAnotherBtn" class="w-full bg-gray-900 text-white py-2.5 rounded-lg font-semibold hover:bg-black transition">
+            <p class="text-xs text-gray-500 text-center mb-4">File uploaded successfully. It will be added to the
+                slideshow once approved.</p>
+            <button id="uploadAnotherBtn"
+                class="w-full bg-gray-900 text-white py-2.5 rounded-lg font-semibold hover:bg-black transition">
                 Upload again
             </button>
         </div>
@@ -104,6 +106,87 @@
         const cancelBtn = document.getElementById("cancelBtn");
         const commentForm = document.getElementById("commentForm");
         let xhr;
+
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+
+            const fileInput = document.getElementById("fileInput");
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("picture", file);
+
+            xhr = new XMLHttpRequest();
+            xhr.open("POST", "/upload");
+
+            uploadBtn.classList.add("hidden");
+            cancelBtn.classList.remove("hidden"); // show cancel during upload
+
+            xhr.upload.addEventListener("progress", (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    progressWrapper.classList.remove("hidden");
+                    progressBar.style.width = percent + "%";
+                    progressText.innerText = percent + "%";
+                    status.innerText = "";
+                }
+            });
+
+            xhr.onload = () => {
+                progressWrapper.classList.add("hidden");
+                if (xhr.status === 200) {
+                    form.classList.add("hidden");
+                    successState.classList.remove("hidden");
+                    status.innerText = "";
+
+                    // Hide cancel on success
+                    cancelBtn.classList.add("hidden");
+                } else {
+                    uploadBtn.classList.remove("hidden");
+                    status.innerText = "Upload failed: " + xhr.responseText;
+                    status.className = "text-xs text-red-600 mt-6 text-center";
+                }
+            };
+
+            xhr.onerror = () => {
+                uploadBtn.classList.remove("hidden");
+                status.innerText = "Upload failed: network error";
+                status.className = "text-xs text-red-600 mt-6 text-center";
+            };
+
+            xhr.send(formData);
+        });
+
+        cancelBtn.addEventListener("click", () => {
+            if (xhr) {
+                xhr.abort();
+            }
+
+            form.reset();
+            progressWrapper.classList.add("hidden");
+            progressBar.style.width = "0%";
+            progressText.innerText = "0%";
+            status.innerText = "Upload cancelled";
+            status.className = "text-xs text-gray-500 mt-6 text-center";
+
+            uploadBtn.classList.remove("hidden");
+            cancelBtn.classList.add("hidden");
+        });
+
+        uploadAnotherBtn.addEventListener("click", () => {
+            form.reset();
+            form.classList.remove("hidden");
+            progressWrapper.classList.add("hidden");
+            progressBar.style.width = "0%";
+            progressText.innerText = "0%";
+            successState.classList.add("hidden");
+            status.innerText = "";
+            status.className = "text-xs text-gray-500 mt-6 text-center";
+
+            uploadBtn.classList.remove("hidden");
+            cancelBtn.classList.add("hidden");
+        });
 
         if (commentForm) {
             const mediaGrid = document.getElementById("mediaGrid");
@@ -207,117 +290,36 @@
                 }
             });
 
-        form.addEventListener("submit", (e) => {
-            e.preventDefault();
-
-            const fileInput = document.getElementById("fileInput");
-            const file = fileInput.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append("picture", file);
-
-            xhr = new XMLHttpRequest();
-            xhr.open("POST", "/upload");
-
-            uploadBtn.classList.add("hidden");
-            cancelBtn.classList.remove("hidden"); // show cancel during upload
-
-            xhr.upload.addEventListener("progress", (event) => {
-                if (event.lengthComputable) {
-                    const percent = Math.round((event.loaded / event.total) * 100);
-                    progressWrapper.classList.remove("hidden");
-                    progressBar.style.width = percent + "%";
-                    progressText.innerText = percent + "%";
-                    status.innerText = "";
-                }
-            });
-
-            xhr.onload = () => {
-                progressWrapper.classList.add("hidden");
-                if (xhr.status === 200) {
-                    form.classList.add("hidden");
-                    successState.classList.remove("hidden");
-                    status.innerText = "";
-
-                    // Hide cancel on success
-                    cancelBtn.classList.add("hidden");
-                } else {
-                    uploadBtn.classList.remove("hidden");
-                    status.innerText = "Upload failed: " + xhr.responseText;
-                    status.className = "text-xs text-red-600 mt-6 text-center";
-                }
-            };
-
-            xhr.onerror = () => {
-                uploadBtn.classList.remove("hidden");
-                status.innerText = "Upload failed: network error";
-                status.className = "text-xs text-red-600 mt-6 text-center";
-            };
-
-            xhr.send(formData);
-        });
-
-        cancelBtn.addEventListener("click", () => {
-            if (xhr) {
-                xhr.abort();
-            }
-
-            form.reset();
-            progressWrapper.classList.add("hidden");
-            progressBar.style.width = "0%";
-            progressText.innerText = "0%";
-            status.innerText = "Upload cancelled";
-            status.className = "text-xs text-gray-500 mt-6 text-center";
-
-            uploadBtn.classList.remove("hidden");
-            cancelBtn.classList.add("hidden");
-        });
-
-        uploadAnotherBtn.addEventListener("click", () => {
-            form.reset();
-            form.classList.remove("hidden");
-            progressWrapper.classList.add("hidden");
-            progressBar.style.width = "0%";
-            progressText.innerText = "0%";
-            successState.classList.add("hidden");
-            status.innerText = "";
-            status.className = "text-xs text-gray-500 mt-6 text-center";
-
-            uploadBtn.classList.remove("hidden");
-            cancelBtn.classList.add("hidden");
-        });
-
             commentForm.addEventListener("submit", (e) => {
-            e.preventDefault();
-            commentStatus.className = "text-xs text-gray-500 text-center";
+                e.preventDefault();
+                commentStatus.className = "text-xs text-gray-500 text-center";
 
-            if (!selectedFilename.value) {
-                commentStatus.innerText = "Select a media file first.";
-                return;
-            }
+                if (!selectedFilename.value) {
+                    commentStatus.innerText = "Select a media file first.";
+                    return;
+                }
 
-            if (!commentInput.value.trim()) {
-                commentStatus.innerText = "Add a comment before submitting.";
-                return;
-            }
+                if (!commentInput.value.trim()) {
+                    commentStatus.innerText = "Add a comment before submitting.";
+                    return;
+                }
 
-            const formData = new FormData();
-            formData.append("filename", selectedFilename.value);
-            formData.append("comment", commentInput.value.trim());
+                const formData = new FormData();
+                formData.append("filename", selectedFilename.value);
+                formData.append("comment", commentInput.value.trim());
 
-            fetch("/comment", { method: "POST", body: formData })
-                .then((res) => {
-                    if (!res.ok) {
-                        throw new Error("Request failed");
-                    }
-                    commentStatus.innerText = "Comment saved.";
-                    commentInput.value = "";
-                })
-                .catch(() => {
-                    commentStatus.className = "text-xs text-red-600 text-center";
-                    commentStatus.innerText = "Failed to save comment.";
-                });
+                fetch("/comment", { method: "POST", body: formData })
+                    .then((res) => {
+                        if (!res.ok) {
+                            throw new Error("Request failed");
+                        }
+                        commentStatus.innerText = "Comment saved.";
+                        commentInput.value = "";
+                    })
+                    .catch(() => {
+                        commentStatus.className = "text-xs text-red-600 text-center";
+                        commentStatus.innerText = "Failed to save comment.";
+                    });
             });
         }
     </script>

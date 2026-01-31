@@ -4,9 +4,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/creack/pty"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,29 +56,59 @@ func TestPromptUserInputsDefaults(t *testing.T) {
 	withStdin(t, "Y\n", func() {
 		got, err := promptUserInputs(defaultDir)
 		assert.NoError(t, err)
-		if assert.NotNil(t, got) {
-			assert.Equal(t, defaultDir, got.DataDir)
-			assert.Equal(t, "8000", got.Port)
-			assert.Nil(t, got.Admin)
-		}
+		assert.NotNil(t, got)
+		assert.Equal(t, defaultDir, got.DataDir)
+		assert.Equal(t, "8000", got.Port)
+		assert.Equal(t, "admin", got.Admin["admin"])
+		assert.False(t, got.ApprovalsEnabled)
+		assert.True(t, got.DanmuEnabled)
 	})
 }
 
-func TestPromptUserInputsCustomNoAdmin(t *testing.T) {
+func TestPromptUserInputsCustomDefaults(t *testing.T) {
 	tmp := t.TempDir()
 	defaultDir := filepath.Join(tmp, "default")
 	customDir := filepath.Join(tmp, "custom")
 
-	withStdin(t, "n\n9090\n"+customDir+"\nn\n", func() {
+	withPtyStdin(t, "n\n9090\n"+customDir+"\nn\nn\n\n\n", func() {
 		got, err := promptUserInputs(defaultDir)
 		assert.NoError(t, err)
-		if assert.NotNil(t, got) {
-			assert.Equal(t, customDir, got.DataDir)
-			assert.Equal(t, "9090", got.Port)
-			assert.Nil(t, got.Admin)
-		}
+		assert.NotNil(t, got)
+		assert.Equal(t, customDir, got.DataDir)
+		assert.Equal(t, "9090", got.Port)
+		assert.Equal(t, "admin", got.Admin["admin"])
+		assert.False(t, got.ApprovalsEnabled)
+		assert.False(t, got.DanmuEnabled)
 
 		_, statErr := os.Stat(customDir)
 		assert.NoError(t, statErr)
 	})
+}
+
+// Helpers
+
+func withPtyStdin(t *testing.T, input string, fn func()) {
+	t.Helper()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("pty not supported on windows")
+	}
+
+	masterFile, slaveFile, err := pty.Open()
+	assert.NoError(t, err)
+	assert.NotNil(t, masterFile)
+	assert.NotNil(t, slaveFile)
+	defer func() {
+		_ = masterFile.Close()
+		_ = slaveFile.Close()
+	}()
+
+	old := os.Stdin
+	os.Stdin = slaveFile
+	defer func() { os.Stdin = old }()
+
+	_, _ = masterFile.Write([]byte(input))
+	_ = masterFile.Sync()
+
+	fn()
 }

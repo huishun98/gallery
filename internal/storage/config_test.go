@@ -64,3 +64,70 @@ func TestLoadSettingsDefaultsDanmuEnabled(t *testing.T) {
 	assert.NotNil(t, out)
 	assert.False(t, out.DanmuEnabled)
 }
+
+func TestValidateSettingsNil(t *testing.T) {
+	assert.Error(t, ValidateSettings(nil))
+}
+
+func TestValidateSettingsMissingDataDir(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		Admin:            gin.Accounts{"admin": "secret"},
+		Port:             "8000",
+		DanmuEnabled:     true,
+		ApprovalsEnabled: false,
+	})
+	assert.Error(t, err)
+}
+
+func TestValidateSettingsMissingPort(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		DataDir:          "data-dir",
+		Admin:            gin.Accounts{"admin": "secret"},
+		DanmuEnabled:     true,
+		ApprovalsEnabled: false,
+	})
+	assert.Error(t, err)
+}
+
+func TestValidateSettingsMissingAdmin(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		DataDir:          "data-dir",
+		Port:             "8000",
+		DanmuEnabled:     true,
+		ApprovalsEnabled: false,
+	})
+	assert.Error(t, err)
+}
+
+func TestValidateSettingsEmptyAdminUser(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		DataDir:          "data-dir",
+		Admin:            gin.Accounts{"": "secret"},
+		Port:             "8000",
+		DanmuEnabled:     true,
+		ApprovalsEnabled: false,
+	})
+	assert.Error(t, err)
+}
+
+func TestValidateSettingsEmptyAdminPassword(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		DataDir:          "data-dir",
+		Admin:            gin.Accounts{"admin": ""},
+		Port:             "8000",
+		DanmuEnabled:     true,
+		ApprovalsEnabled: false,
+	})
+	assert.Error(t, err)
+}
+
+func TestValidateSettingsValid(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		DataDir:          "data-dir",
+		Admin:            gin.Accounts{"admin": "secret"},
+		Port:             "8000",
+		DanmuEnabled:     true,
+		ApprovalsEnabled: false,
+	})
+	assert.NoError(t, err)
+}

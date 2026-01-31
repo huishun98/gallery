@@ -101,8 +101,12 @@ sudo apt install cloudflared ffmpeg
 go run main.go
 ```
 
-## Admin mode
-Admin mode adds a basic-auth protected review queue. Uploads go to `media/pending` instead of the slideshow, and an admin approves or rejects each item from `/admin`. Approved files move into `media/media` and appear in the slideshow; rejected files move to `media/rejected`.
+## Admin mode (basic auth)
+Admin mode adds a basic-auth protected review queue. Uploads go to `media/pending` instead of the slideshow, and an admin approves or rejects each item from `/admin/review`. Approved files move into `media/media` and appear in the slideshow; rejected files move to `media/rejected`.
+
+Default admin credentials are `admin` / `admin`. To change them, update the `settings.json` file in the data directory.
+
+If danmu is enabled, admins can also manage comments at `/admin/comments`.
 
 ## Danmu comments
 Danmu comments can be disabled during setup. When disabled, comment submission, comment browsing, and the admin comment management page are hidden and their routes are not registered.
@@ -110,7 +114,8 @@ Danmu comments can be disabled during setup. When disabled, comment submission, 
 ## Routes
 - `/` Upload page.
 - `/slideshow` Fullscreen slideshow with QR code.
-- `/admin` Admin review UI (only if admin enabled).
+- `/admin/review` Admin review UI (only if admin enabled).
+- `/admin/comments` Admin comment management UI (only if danmu enabled).
 
 ## Data storage
 - Local run: `./.data` in the project directory.

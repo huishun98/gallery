@@ -69,7 +69,7 @@
         const content = document.getElementById('content');
 
         async function loadMedia() {
-            const res = await fetch('/admin/pending');
+            const res = await fetch('/admin/media/pending');
 
             if (!res.ok || res.status === 204) {
                 currentMedia = null;

@@ -20,10 +20,10 @@ func TestPendingReturnsFirstFile(t *testing.T) {
 	assert.NoError(t, os.WriteFile(filepath.Join(tmp, "b.mp4"), []byte("x"), 0644))
 
 	r := gin.New()
-	r.GET("/pending", Pending(tmp))
+	r.GET("/media/pending", Pending(tmp))
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pending", nil)
+	req := httptest.NewRequest(http.MethodGet, "/media/pending", nil)
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -40,10 +40,10 @@ func TestPendingNoFiles(t *testing.T) {
 	tmp := t.TempDir()
 
 	r := gin.New()
-	r.GET("/pending", Pending(tmp))
+	r.GET("/media/pending", Pending(tmp))
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pending", nil)
+	req := httptest.NewRequest(http.MethodGet, "/media/pending", nil)
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusNoContent, w.Code)

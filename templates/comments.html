@@ -15,7 +15,11 @@
                 <h2 class="text-xl font-semibold text-gray-800 mb-2">Delete comments</h2>
                 <p class="text-sm text-gray-500 mb-6">Review recent comments and remove unwanted entries.</p>
             </div>
-            <a href="/admin" class="text-xs text-blue-600 hover:underline">Manage photos</a>
+
+            {{if .ApprovalsEnabled}}
+            <a href="/admin/review" class="text-xs text-blue-600 hover:underline">Manage photos</a>
+            {{end}}
+
         </div>
 
         <div class="flex flex-col gap-2 text-xs text-gray-600 md:flex-row md:items-center md:justify-between">

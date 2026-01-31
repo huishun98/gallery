@@ -43,11 +43,18 @@ func waitForPort(addr string, timeout time.Duration) error {
 
 func promptUserInputs(defaultDataDir string) (*storage.Settings, error) {
 	reader := bufio.NewReader(os.Stdin)
+
+	username := "admin"
+	password := "admin"
+
 	config := &storage.Settings{
-		DataDir:      defaultDataDir,
-		Port:         "8000",
-		Admin:        nil,
-		DanmuEnabled: true,
+		DataDir: defaultDataDir,
+		Port:    "8000",
+		Admin: gin.Accounts{
+			username: password,
+		},
+		ApprovalsEnabled: false,
+		DanmuEnabled:     true,
 	}
 
 	// 0. Ask if should use defaults
@@ -88,26 +95,32 @@ func promptUserInputs(defaultDataDir string) (*storage.Settings, error) {
 
 	// 4. Ask if admin site is needed
 	fmt.Print("Require admin approval for uploads? (y/N): ")
-	enableAdminRaw, _ := reader.ReadString('\n')
-	enableAdmin := strings.TrimSpace(strings.ToLower(enableAdminRaw))
-
-	if enableAdmin != "y" {
-		return config, nil
+	enableApprovalsRaw, _ := reader.ReadString('\n')
+	enableApprovals := strings.TrimSpace(strings.ToLower(enableApprovalsRaw))
+	if enableApprovals == "y" {
+		config.ApprovalsEnabled = true
 	}
 
 	// 4. Username
-	fmt.Print("Set admin username: ")
-	username, _ := reader.ReadString('\n')
-	username = strings.TrimSpace(username)
+	fmt.Print("Set admin username [admin]: ")
+	usernameInput, _ := reader.ReadString('\n')
+	usernameInput = strings.TrimSpace(usernameInput)
+	if usernameInput != "" {
+		username = usernameInput
+	}
 
 	// 5. Password (hidden input)
-	fmt.Print("Set admin password: ")
+	fmt.Print("Set admin password [admin]: ")
 	passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println() // newline after hidden input
 	if err != nil {
 		return config, err
 	}
-	password := strings.TrimSpace(string(passwordBytes))
+	passwordInput := strings.TrimSpace(string(passwordBytes))
+	if passwordInput != "" {
+		password = passwordInput
+	}
+
 	config.Admin = gin.Accounts{
 		username: password,
 	}
@@ -140,11 +153,12 @@ func main() {
 	}
 
 	// Prompt for inputs
-	if config == nil {
+	if storage.ValidateSettings(config) != nil {
 		config, err = promptUserInputs(defaultDataDir)
 		if err != nil {
 			log.Fatal(err)
 		}
+		fmt.Println()
 		if err := storage.SaveSettings(defaultDataDir, config); err != nil {
 			log.Fatal("failed to save setting: ", err)
 		}
@@ -160,7 +174,7 @@ func main() {
 	r := gin.Default()
 	r.SetHTMLTemplate(template.Must(template.ParseFS(templatesFS, "templates/*")))
 
-	router.SetupRoutes(r, db, config.DataDir, config.Admin, config.DanmuEnabled)
+	router.SetupRoutes(r, db, config.DataDir, config.Admin, config.ApprovalsEnabled, config.DanmuEnabled)
 
 	// Start Gin server
 	go func() {
@@ -189,15 +203,15 @@ func main() {
 	fmt.Println()
 	fmt.Printf("● Your Gallery is ready at: %s/slideshow", tunnel.PublicURL)
 	fmt.Println()
-	if config.Admin != nil {
-		fmt.Printf("● Approve or reject uploaded photos at: %s/admin", tunnel.PublicURL)
+	if config.ApprovalsEnabled {
+		fmt.Printf("● Approve or reject uploaded photos at: %s/admin/review", tunnel.PublicURL)
 		fmt.Println()
 	}
 	fmt.Printf("● Your photos and videos are stored at: %s", config.DataDir)
 	fmt.Println()
-	fmt.Printf("● Your application settings are stored at: %s", storage.SettingsFilepath(defaultDataDir))
+	fmt.Printf("● Update your application settings at: %s", storage.SettingsFilepath(defaultDataDir))
 	fmt.Println()
-	fmt.Println("● Need help? Check out our FAQ: https://github.com/huishun98/gallery/wiki")
+	fmt.Println("● Need help? Check out our FAQ: https://github.com/huishun98/gallery/wiki/FAQ")
 	fmt.Println()
 	fmt.Println()
 
