@@ -163,6 +163,7 @@ func run(log *logrus.Logger) error {
 			return fmt.Errorf("failed to save setting: %w", err)
 		}
 	}
+	config.TunnelDisabled = os.Getenv("DISABLE_TUNNEL") != ""
 
 	dbPath := filepath.Join(config.DataDir, "app.db")
 	db, err := storage.InitDB(dbPath)
@@ -194,17 +195,21 @@ func run(log *logrus.Logger) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	tunnel, err := tunnel.StartTunnel(ctx, "http://localhost:"+config.Port)
-	if err != nil {
-		return err
+	publicURL := "http://localhost:" + config.Port
+	if !config.TunnelDisabled {
+		tunnelClient, err := tunnel.StartTunnel(ctx, publicURL)
+		if err != nil {
+			return err
+		}
+		defer tunnelClient.Close()
+		publicURL = tunnelClient.PublicURL
 	}
-	defer tunnel.Close()
 
 	fmt.Println()
-	fmt.Printf("● Your Gallery is ready at: %s/slideshow", tunnel.PublicURL)
+	fmt.Printf("● Your Gallery is ready at: %s/slideshow", publicURL)
 	fmt.Println()
 	if config.ApprovalsEnabled {
-		fmt.Printf("● Approve or reject uploaded photos at: %s/admin/review", tunnel.PublicURL)
+		fmt.Printf("● Approve or reject uploaded photos at: %s/admin/review", publicURL)
 		fmt.Println()
 	}
 	fmt.Printf("● Your photos and videos are stored at: %s", config.DataDir)
@@ -215,7 +220,7 @@ func run(log *logrus.Logger) error {
 	fmt.Println()
 	fmt.Println()
 
-	handlers.NgrokURL.Store(tunnel.PublicURL)
+	handlers.NgrokURL.Store(publicURL)
 
 	// Block forever
 	select {}

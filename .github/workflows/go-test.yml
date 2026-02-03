@@ -2,6 +2,7 @@ name: Go test
 
 on:
   push:
+  workflow_dispatch:
 
 jobs:
   test:

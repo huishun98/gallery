@@ -18,6 +18,7 @@ type Settings struct {
 	Port             string       `json:"port" validate:"required,notblank"`
 	DanmuEnabled     bool         `json:"danmu_enabled"`
 	ApprovalsEnabled bool         `json:"approvals_enabled"`
+	TunnelDisabled   bool         `json:"tunnel_disabled"`
 }
 
 // App constants
