@@ -21,6 +21,7 @@ import (
 
 	"github.com/common-nighthawk/go-figure"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/term"
 )
 
@@ -128,7 +129,7 @@ func promptUserInputs(defaultDataDir string) (*storage.Settings, error) {
 	return config, nil
 }
 
-func main() {
+func run(log *logrus.Logger) error {
 	// Force Gin into release mode before engine init
 	gin.SetMode(gin.ReleaseMode)
 
@@ -140,34 +141,33 @@ func main() {
 	fmt.Println("Press Enter to continue or Ctrl+C to abort.")
 	fmt.Println()
 
-	log := logger.New()
-
 	defaultDataDir, err := storage.DataDir("Gallery")
 	if err != nil {
-		log.Fatal("cannot find data directory:", err)
+		return fmt.Errorf("cannot find data directory: %w", err)
 	}
 
+	// Load settings
 	config, err := storage.LoadSettings(defaultDataDir)
 	if err != nil {
-		log.Error("failed to get settings file:", err)
+		return fmt.Errorf("failed to get settings file: %w", err)
 	}
 
 	// Prompt for inputs
 	if storage.ValidateSettings(config) != nil {
 		config, err = promptUserInputs(defaultDataDir)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		fmt.Println()
 		if err := storage.SaveSettings(defaultDataDir, config); err != nil {
-			log.Fatal("failed to save setting: ", err)
+			return fmt.Errorf("failed to save setting: %w", err)
 		}
 	}
 
 	dbPath := filepath.Join(config.DataDir, "app.db")
 	db, err := storage.InitDB(dbPath)
 	if err != nil {
-		log.Fatalf("failed to open db: %v, please check data directory path in configuration file: %s", err, storage.SettingsFilepath(defaultDataDir))
+		return fmt.Errorf("failed to open db: %v, please check data directory path in configuration file: %s", err, storage.SettingsFilepath(defaultDataDir))
 	}
 	defer db.Close()
 
@@ -179,7 +179,7 @@ func main() {
 	// Start Gin server
 	go func() {
 		if err := r.Run(":" + config.Port); err != nil {
-			log.Fatal(err)
+			log.Errorf("failed to run server: %v", err)
 		}
 	}()
 
@@ -187,7 +187,7 @@ func main() {
 
 	// Wait for port 8000 to be ready
 	if err := waitForPort("127.0.0.1:"+config.Port, 5*time.Second); err != nil {
-		log.Fatal("server not ready:", err)
+		return fmt.Errorf("server not ready: %w", err)
 	}
 
 	// Start Cloudflare tunnel
@@ -196,7 +196,7 @@ func main() {
 
 	tunnel, err := tunnel.StartTunnel(ctx, "http://localhost:"+config.Port)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer tunnel.Close()
 
@@ -219,4 +219,15 @@ func main() {
 
 	// Block forever
 	select {}
+}
+
+func main() {
+	log := logger.New()
+	if err := run(log); err != nil {
+		log.Error(err)
+		if term.IsTerminal(int(os.Stdin.Fd())) {
+			fmt.Println("Press Enter to exit...")
+			bufio.NewReader(os.Stdin).ReadBytes('\n')
+		}
+	}
 }
