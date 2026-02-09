@@ -18,6 +18,7 @@ type Settings struct {
 	Port             string       `json:"port" validate:"required,notblank"`
 	DanmuEnabled     bool         `json:"danmu_enabled"`
 	ApprovalsEnabled bool         `json:"approvals_enabled"`
+	UploadsEnabled   bool         `json:"uploads_enabled"`
 	TunnelDisabled   bool         `json:"tunnel_disabled"`
 }
 
@@ -83,6 +84,10 @@ func SaveSettings(dataDir string, s *Settings) error {
 func ValidateSettings(s *Settings) error {
 	if s == nil {
 		return errors.New("settings is required")
+	}
+
+	if !s.UploadsEnabled && !s.DanmuEnabled {
+		return errors.New("danmu must be enabled when guest uploads are disabled")
 	}
 
 	v := validator.New()

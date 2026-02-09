@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import net from 'node:net';
 import path from 'node:path';
 
+import { getFreePort } from './helpers/getFreePort';
 import { waitForServer } from './helpers/waitForServer';
 
 test('admin comments requires auth', async ({ request }) => {
@@ -11,8 +11,9 @@ test('admin comments requires auth', async ({ request }) => {
 });
 
 test('admin comments renders with auth', async ({ browser }) => {
+  const baseURL = test.info().project.use.baseURL as string;
   const context = await browser.newContext({
-    baseURL: 'http://127.0.0.1:8000',
+    baseURL,
     httpCredentials: { username: 'admin', password: 'admin' },
   });
   const page = await context.newPage();
@@ -56,20 +57,7 @@ test('admin comments download and delete work', async ({ request }) => {
 });
 
 test('admin comments not available when danmu disabled', async ({ request }) => {
-  const port = await new Promise<number>((resolve, reject) => {
-    const server = net.createServer();
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => {
-        if (address && typeof address === 'object') {
-          resolve(address.port);
-        } else {
-          reject(new Error('failed to resolve free port'));
-        }
-      });
-    });
-    server.on('error', reject);
-  });
+  const port = await getFreePort();
   const baseURL = `http://127.0.0.1:${port}`;
 
   const serverProcess = spawn('tsx', ['scripts/e2e-server.ts'], {

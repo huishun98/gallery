@@ -11,6 +11,7 @@ Lightweight local gallery server for sharing photos and short videos during an e
 - Cloudflare tunnel URL and QR code for easy sharing.
 - Optional admin approval flow (pending/approve/reject).
 - Comments per photo/video, shown as live comments (danmu) overlay.
+- Option to disable guest uploads (admin-provided media only).
 - Short video support with a 30s limit.
 - SQLite-backed comments storage.
 
@@ -74,8 +75,9 @@ docker run --rm -it -p 8000:8000 -v "$PWD/.data:/app/.data" gallery
 
 You will be prompted for:
 - Port (default 8000)
-- Whether to enable admin mode (basic auth)
-- Whether to enable danmu comments
+- Whether to allow guest uploads
+- Whether to enable danmu comments (skipped if uploads are disabled)
+- Whether to require admin approval for uploads (only if uploads are enabled)
 
 When the server starts, it logs the public URL and the data directory.
 
@@ -110,6 +112,14 @@ If danmu is enabled, admins can also manage comments at `/admin/comments`.
 
 ## Danmu comments
 Danmu comments can be disabled during setup. When disabled, comment submission, comment browsing, and the admin comment management page are hidden and their routes are not registered.
+
+## Admin-provided media (uploads disabled)
+If you disable guest uploads, the upload page switches to comment-only mode and danmu is always enabled. In this mode, you must place photos/videos into the approved media folder before guests can comment.
+
+Steps:
+1) During setup, answer `n` to "Allow guest uploads?" (or set `"uploads_enabled": false` in `settings.json`).
+2) Copy your media files into `<dataDir>/media/media`.
+3) Start the server (or refresh the slideshow) to load the files.
 
 ## Routes
 - `/` Upload page.

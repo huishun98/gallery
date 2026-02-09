@@ -56,6 +56,7 @@ func promptUserInputs(defaultDataDir string) (*storage.Settings, error) {
 		},
 		ApprovalsEnabled: false,
 		DanmuEnabled:     true,
+		UploadsEnabled:   true,
 	}
 
 	// 0. Ask if should use defaults
@@ -86,23 +87,33 @@ func promptUserInputs(defaultDataDir string) (*storage.Settings, error) {
 		return config, err
 	}
 
-	// 3. Ask if danmu comments should be enabled
-	fmt.Print("Enable danmu comments? (Y/n): ")
-	enableDanmuRaw, _ := reader.ReadString('\n')
-	enableDanmu := strings.TrimSpace(strings.ToLower(enableDanmuRaw))
-	if enableDanmu == "n" {
-		config.DanmuEnabled = false
+	// 3. Ask if guest uploads should be enabled
+	fmt.Print("Allow guest uploads? (Y/n): ")
+	enableUploadsRaw, _ := reader.ReadString('\n')
+	enableUploads := strings.TrimSpace(strings.ToLower(enableUploadsRaw))
+	if enableUploads == "n" {
+		config.UploadsEnabled = false
+		config.DanmuEnabled = true
+		config.ApprovalsEnabled = false
+	} else {
+		// 4. Ask if danmu comments should be enabled
+		fmt.Print("Enable danmu comments? (Y/n): ")
+		enableDanmuRaw, _ := reader.ReadString('\n')
+		enableDanmu := strings.TrimSpace(strings.ToLower(enableDanmuRaw))
+		if enableDanmu == "n" {
+			config.DanmuEnabled = false
+		}
+
+		// 5. Ask if admin site is needed
+		fmt.Print("Require admin approval for uploads? (y/N): ")
+		enableApprovalsRaw, _ := reader.ReadString('\n')
+		enableApprovals := strings.TrimSpace(strings.ToLower(enableApprovalsRaw))
+		if enableApprovals == "y" {
+			config.ApprovalsEnabled = true
+		}
 	}
 
-	// 4. Ask if admin site is needed
-	fmt.Print("Require admin approval for uploads? (y/N): ")
-	enableApprovalsRaw, _ := reader.ReadString('\n')
-	enableApprovals := strings.TrimSpace(strings.ToLower(enableApprovalsRaw))
-	if enableApprovals == "y" {
-		config.ApprovalsEnabled = true
-	}
-
-	// 4. Username
+	// 6. Username
 	fmt.Print("Set admin username [admin]: ")
 	usernameInput, _ := reader.ReadString('\n')
 	usernameInput = strings.TrimSpace(usernameInput)
@@ -110,7 +121,7 @@ func promptUserInputs(defaultDataDir string) (*storage.Settings, error) {
 		username = usernameInput
 	}
 
-	// 5. Password (hidden input)
+	// 7. Password (hidden input)
 	fmt.Print("Set admin password [admin]: ")
 	passwordBytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println() // newline after hidden input
@@ -127,6 +138,23 @@ func promptUserInputs(defaultDataDir string) (*storage.Settings, error) {
 	}
 
 	return config, nil
+}
+
+func createMediaDirs(dataDir string, uploadsEnabled, approvalsEnabled bool) error {
+	mediaDir := filepath.Join(dataDir, "media")
+	approvedDir := filepath.Join(mediaDir, "media")
+	if err := os.MkdirAll(approvedDir, 0755); err != nil {
+		return fmt.Errorf("failed to create media directory: %w", err)
+	}
+	if uploadsEnabled && approvalsEnabled {
+		if err := os.MkdirAll(filepath.Join(mediaDir, "pending"), 0755); err != nil {
+			return fmt.Errorf("failed to create pending directory: %w", err)
+		}
+		if err := os.MkdirAll(filepath.Join(mediaDir, "rejected"), 0755); err != nil {
+			return fmt.Errorf("failed to create rejected directory: %w", err)
+		}
+	}
+	return nil
 }
 
 func run(log *logrus.Logger) error {
@@ -152,6 +180,10 @@ func run(log *logrus.Logger) error {
 		return fmt.Errorf("failed to get settings file: %w", err)
 	}
 
+	if err := os.MkdirAll(config.DataDir, 0755); err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
+
 	// Prompt for inputs
 	if storage.ValidateSettings(config) != nil {
 		config, err = promptUserInputs(defaultDataDir)
@@ -165,6 +197,7 @@ func run(log *logrus.Logger) error {
 	}
 	config.TunnelDisabled = os.Getenv("DISABLE_TUNNEL") != ""
 
+	// Initialize database
 	dbPath := filepath.Join(config.DataDir, "app.db")
 	db, err := storage.InitDB(dbPath)
 	if err != nil {
@@ -172,10 +205,15 @@ func run(log *logrus.Logger) error {
 	}
 	defer db.Close()
 
+	// Create necessary directories
+	if err := createMediaDirs(config.DataDir, config.UploadsEnabled, config.ApprovalsEnabled); err != nil {
+		return err
+	}
+
 	r := gin.Default()
 	r.SetHTMLTemplate(template.Must(template.ParseFS(templatesFS, "templates/*")))
 
-	router.SetupRoutes(r, db, config.DataDir, config.Admin, config.ApprovalsEnabled, config.DanmuEnabled)
+	router.SetupRoutes(r, db, config.DataDir, config.Admin, config.ApprovalsEnabled, config.DanmuEnabled, config.UploadsEnabled)
 
 	// Start Gin server
 	go func() {
@@ -212,7 +250,11 @@ func run(log *logrus.Logger) error {
 		fmt.Printf("● Approve or reject uploaded photos at: %s/admin/review", publicURL)
 		fmt.Println()
 	}
-	fmt.Printf("● Your photos and videos are stored at: %s", config.DataDir)
+	if config.UploadsEnabled {
+		fmt.Printf("● Your photos and videos are stored at: %s", config.DataDir)
+	} else {
+		fmt.Printf("● Uploads are disabled. Add photos/videos to: %s", filepath.Join(config.DataDir, "media", "media"))
+	}
 	fmt.Println()
 	fmt.Printf("● Update your application settings at: %s", storage.SettingsFilepath(defaultDataDir))
 	fmt.Println()

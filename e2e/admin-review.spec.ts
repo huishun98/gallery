@@ -3,6 +3,7 @@ import { ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { getFreePort } from './helpers/getFreePort';
 import { waitForServer } from './helpers/waitForServer';
 
 const clearDir = (dir: string) => {
@@ -22,8 +23,8 @@ test.describe.serial('approvals disabled', () => {
 });
 
 test.describe.serial('approvals enabled', () => {
-  const port = 8002;
-  const baseURL = `http://127.0.0.1:${port}`;
+  let port: number;
+  let baseURL: string;
   const workDir = path.join(process.cwd(), '.e2e-workdir', 'approvals-on');
   const dataDir = path.join(workDir, '.data');
   const pendingDir = path.join(dataDir, 'media', 'pending');
@@ -32,6 +33,9 @@ test.describe.serial('approvals enabled', () => {
   let serverProcess: ChildProcess;
 
   test.beforeAll(async () => {
+    port = await getFreePort();
+    baseURL = `http://127.0.0.1:${port}`;
+
     fs.mkdirSync(pendingDir, { recursive: true });
     serverProcess = spawn('tsx', ['scripts/e2e-server.ts'], {
       stdio: 'inherit',

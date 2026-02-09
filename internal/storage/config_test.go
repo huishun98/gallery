@@ -128,6 +128,43 @@ func TestValidateSettingsValid(t *testing.T) {
 		Port:             "8000",
 		DanmuEnabled:     true,
 		ApprovalsEnabled: false,
+		UploadsEnabled:   true,
+	})
+	assert.NoError(t, err)
+}
+
+func TestValidateSettingsUploadsDisabledRequiresDanmu(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		DataDir:          "data-dir",
+		Admin:            gin.Accounts{"admin": "secret"},
+		Port:             "8000",
+		DanmuEnabled:     false,
+		ApprovalsEnabled: false,
+		UploadsEnabled:   false,
+	})
+	assert.Error(t, err)
+}
+
+func TestValidateSettingsUploadsDisabledWithDanmuEnabled(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		DataDir:          "data-dir",
+		Admin:            gin.Accounts{"admin": "secret"},
+		Port:             "8000",
+		DanmuEnabled:     true,
+		ApprovalsEnabled: false,
+		UploadsEnabled:   false,
+	})
+	assert.NoError(t, err)
+}
+
+func TestValidateSettingsUploadsEnabledWithDanmuDisabled(t *testing.T) {
+	err := ValidateSettings(&Settings{
+		DataDir:          "data-dir",
+		Admin:            gin.Accounts{"admin": "secret"},
+		Port:             "8000",
+		DanmuEnabled:     false,
+		ApprovalsEnabled: false,
+		UploadsEnabled:   true,
 	})
 	assert.NoError(t, err)
 }

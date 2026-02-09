@@ -8,10 +8,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRoutes(r *gin.Engine, db *sql.DB, dataDir string, adminAccount gin.Accounts, approvalsEnabled, danmuEnabled bool) {
+func SetupRoutes(r *gin.Engine, db *sql.DB, dataDir string, adminAccount gin.Accounts, approvalsEnabled, danmuEnabled, uploadsEnabled bool) {
 	mediaDir := filepath.Join(dataDir, "media")
-	uploadDir := filepath.Join(mediaDir, "media")
-	templateData := gin.H{"DanmuEnabled": danmuEnabled, "ApprovalsEnabled": approvalsEnabled}
+
+	approvedDir := filepath.Join(mediaDir, "media")
+	pendingDir := filepath.Join(mediaDir, "pending")
+	rejectedDir := filepath.Join(mediaDir, "rejected")
+
+	uploadDir := approvedDir
+	templateData := gin.H{
+		"DanmuEnabled":     danmuEnabled,
+		"ApprovalsEnabled": approvalsEnabled,
+		"UploadsEnabled":   uploadsEnabled,
+		"MediaDir":         approvedDir,
+	}
 
 	var admin *gin.RouterGroup
 	if approvalsEnabled || danmuEnabled {
@@ -20,17 +30,19 @@ func SetupRoutes(r *gin.Engine, db *sql.DB, dataDir string, adminAccount gin.Acc
 
 	if approvalsEnabled {
 		admin.GET("/review", handlers.Page("decision.html", templateData))
-		admin.GET("/media/pending", handlers.Pending(filepath.Join(mediaDir, "pending")))
-		admin.POST("/media/approve", handlers.MoveMedia(filepath.Join(mediaDir, "pending"), filepath.Join(mediaDir, "media")))
-		admin.POST("/media/reject", handlers.MoveMedia(filepath.Join(mediaDir, "pending"), filepath.Join(mediaDir, "rejected")))
+		admin.GET("/media/pending", handlers.Pending(pendingDir))
+		admin.POST("/media/approve", handlers.MoveMedia(pendingDir, approvedDir))
+		admin.POST("/media/reject", handlers.MoveMedia(pendingDir, rejectedDir))
 
-		uploadDir = filepath.Join(mediaDir, "pending")
+		uploadDir = pendingDir
 	}
 
 	r.GET("/", handlers.Page("upload.html", templateData))
-	r.POST("/upload", handlers.Upload(uploadDir))
+	if uploadsEnabled {
+		r.POST("/upload", handlers.Upload(uploadDir))
+	}
 	r.GET("/slideshow", handlers.Page("slideshow.html", templateData))
-	r.GET("/media", handlers.MediaList(filepath.Join(mediaDir, "media")))
+	r.GET("/media", handlers.MediaList(approvedDir))
 	r.GET("/qr", handlers.QR)
 
 	if danmuEnabled {
@@ -42,6 +54,8 @@ func SetupRoutes(r *gin.Engine, db *sql.DB, dataDir string, adminAccount gin.Acc
 		r.POST("/comment", handlers.SaveComment(db))
 	}
 
-	r.Static("/mediafiles", filepath.Join(mediaDir, "media"))
-	r.Static("/files", filepath.Join(mediaDir, "pending"))
+	r.Static("/mediafiles", approvedDir)
+	if approvalsEnabled {
+		r.Static("/files", pendingDir)
+	}
 }

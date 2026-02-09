@@ -10,6 +10,7 @@
 
 <body class="min-h-screen bg-white md:bg-gray-100 flex items-start md:items-center justify-center">
     <div class="bg-white me:rounded-xl md:shadow-lg p-8 w-full max-w-md">
+        {{if .UploadsEnabled}}
         <h2 class="text-lg font-semibold text-gray-800 mb-6 md:text-center">
             Upload photo or video
         </h2>
@@ -30,8 +31,14 @@
 
         <!-- Success state -->
         <div id="successState" class="hidden text-center">
-            <p class="text-xs text-gray-500 text-center mb-4">File uploaded successfully. It will be added to the
-                slideshow once approved.</p>
+            <p class="text-xs text-gray-500 text-center mb-4">
+                File uploaded successfully.
+                {{if .ApprovalsEnabled}}
+                It will be added to the slideshow once approved.
+                {{else}}
+                It will be added to the slideshow shortly.
+                {{end}}
+            </p>
             <button id="uploadAnotherBtn"
                 class="w-full bg-gray-900 text-white py-2.5 rounded-lg font-semibold hover:bg-black transition">
                 Upload again
@@ -58,9 +65,10 @@
                 Upload
             </button>
         </form>
+        {{end}}
 
         {{if .DanmuEnabled}}
-        <div class="border-t border-gray-200 mt-8 pt-6">
+        <div class="{{if .UploadsEnabled}}border-t border-gray-200 mt-8 pt-6{{else}}mt-2{{end}}">
             <h3 class="text-lg font-semibold text-gray-800 mb-4 md:text-center">Comment on a photo or video</h3>
             <form id="commentForm" class="space-y-4">
                 <input type="hidden" id="selectedFilename" name="filename" />
@@ -96,97 +104,100 @@
 
     <script>
         const form = document.getElementById("uploadForm");
-        const progressWrapper = document.getElementById("progressWrapper");
-        const progressBar = document.getElementById("progressBar");
-        const progressText = document.getElementById("progressText");
-        const status = document.getElementById("status");
-        const successState = document.getElementById("successState");
-        const uploadBtn = document.getElementById("uploadBtn");
-        const uploadAnotherBtn = document.getElementById("uploadAnotherBtn");
-        const cancelBtn = document.getElementById("cancelBtn");
         const commentForm = document.getElementById("commentForm");
         let xhr;
 
-        form.addEventListener("submit", (e) => {
-            e.preventDefault();
+        if (form) {
+            const progressWrapper = document.getElementById("progressWrapper");
+            const progressBar = document.getElementById("progressBar");
+            const progressText = document.getElementById("progressText");
+            const status = document.getElementById("status");
+            const successState = document.getElementById("successState");
+            const uploadBtn = document.getElementById("uploadBtn");
+            const uploadAnotherBtn = document.getElementById("uploadAnotherBtn");
+            const cancelBtn = document.getElementById("cancelBtn");
 
-            const fileInput = document.getElementById("fileInput");
-            const file = fileInput.files[0];
-            if (!file) return;
+            form.addEventListener("submit", (e) => {
+                e.preventDefault();
 
-            const formData = new FormData();
-            formData.append("picture", file);
+                const fileInput = document.getElementById("fileInput");
+                const file = fileInput.files[0];
+                if (!file) return;
 
-            xhr = new XMLHttpRequest();
-            xhr.open("POST", "/upload");
+                const formData = new FormData();
+                formData.append("picture", file);
 
-            uploadBtn.classList.add("hidden");
-            cancelBtn.classList.remove("hidden"); // show cancel during upload
+                xhr = new XMLHttpRequest();
+                xhr.open("POST", "/upload");
 
-            xhr.upload.addEventListener("progress", (event) => {
-                if (event.lengthComputable) {
-                    const percent = Math.round((event.loaded / event.total) * 100);
-                    progressWrapper.classList.remove("hidden");
-                    progressBar.style.width = percent + "%";
-                    progressText.innerText = percent + "%";
-                    status.innerText = "";
-                }
+                uploadBtn.classList.add("hidden");
+                cancelBtn.classList.remove("hidden"); // show cancel during upload
+
+                xhr.upload.addEventListener("progress", (event) => {
+                    if (event.lengthComputable) {
+                        const percent = Math.round((event.loaded / event.total) * 100);
+                        progressWrapper.classList.remove("hidden");
+                        progressBar.style.width = percent + "%";
+                        progressText.innerText = percent + "%";
+                        status.innerText = "";
+                    }
+                });
+
+                xhr.onload = () => {
+                    progressWrapper.classList.add("hidden");
+                    if (xhr.status === 200) {
+                        form.classList.add("hidden");
+                        successState.classList.remove("hidden");
+                        status.innerText = "";
+
+                        // Hide cancel on success
+                        cancelBtn.classList.add("hidden");
+                    } else {
+                        uploadBtn.classList.remove("hidden");
+                        status.innerText = "Upload failed: " + xhr.responseText;
+                        status.className = "text-xs text-red-600 mt-6 text-center";
+                    }
+                };
+
+                xhr.onerror = () => {
+                    uploadBtn.classList.remove("hidden");
+                    status.innerText = "Upload failed: network error";
+                    status.className = "text-xs text-red-600 mt-6 text-center";
+                };
+
+                xhr.send(formData);
             });
 
-            xhr.onload = () => {
-                progressWrapper.classList.add("hidden");
-                if (xhr.status === 200) {
-                    form.classList.add("hidden");
-                    successState.classList.remove("hidden");
-                    status.innerText = "";
-
-                    // Hide cancel on success
-                    cancelBtn.classList.add("hidden");
-                } else {
-                    uploadBtn.classList.remove("hidden");
-                    status.innerText = "Upload failed: " + xhr.responseText;
-                    status.className = "text-xs text-red-600 mt-6 text-center";
+            cancelBtn.addEventListener("click", () => {
+                if (xhr) {
+                    xhr.abort();
                 }
-            };
 
-            xhr.onerror = () => {
+                form.reset();
+                progressWrapper.classList.add("hidden");
+                progressBar.style.width = "0%";
+                progressText.innerText = "0%";
+                status.innerText = "Upload cancelled";
+                status.className = "text-xs text-gray-500 mt-6 text-center";
+
                 uploadBtn.classList.remove("hidden");
-                status.innerText = "Upload failed: network error";
-                status.className = "text-xs text-red-600 mt-6 text-center";
-            };
+                cancelBtn.classList.add("hidden");
+            });
 
-            xhr.send(formData);
-        });
+            uploadAnotherBtn.addEventListener("click", () => {
+                form.reset();
+                form.classList.remove("hidden");
+                progressWrapper.classList.add("hidden");
+                progressBar.style.width = "0%";
+                progressText.innerText = "0%";
+                successState.classList.add("hidden");
+                status.innerText = "";
+                status.className = "text-xs text-gray-500 mt-6 text-center";
 
-        cancelBtn.addEventListener("click", () => {
-            if (xhr) {
-                xhr.abort();
-            }
-
-            form.reset();
-            progressWrapper.classList.add("hidden");
-            progressBar.style.width = "0%";
-            progressText.innerText = "0%";
-            status.innerText = "Upload cancelled";
-            status.className = "text-xs text-gray-500 mt-6 text-center";
-
-            uploadBtn.classList.remove("hidden");
-            cancelBtn.classList.add("hidden");
-        });
-
-        uploadAnotherBtn.addEventListener("click", () => {
-            form.reset();
-            form.classList.remove("hidden");
-            progressWrapper.classList.add("hidden");
-            progressBar.style.width = "0%";
-            progressText.innerText = "0%";
-            successState.classList.add("hidden");
-            status.innerText = "";
-            status.className = "text-xs text-gray-500 mt-6 text-center";
-
-            uploadBtn.classList.remove("hidden");
-            cancelBtn.classList.add("hidden");
-        });
+                uploadBtn.classList.remove("hidden");
+                cancelBtn.classList.add("hidden");
+            });
+        }
 
         if (commentForm) {
             const mediaGrid = document.getElementById("mediaGrid");

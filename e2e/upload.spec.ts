@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { ChildProcess, spawn } from 'node:child_process';
 import fs from 'node:fs';
-import net from 'node:net';
 import path from 'node:path';
 
+import { getFreePort } from './helpers/getFreePort';
 import { waitForServer } from './helpers/waitForServer';
 
 const fixturePath = path.join(__dirname, 'fixtures', 'sample.png');
@@ -52,20 +52,7 @@ test.describe('danmu disabled', () => {
   let serverProcess: ChildProcess;
 
   test.beforeAll(async () => {
-    port = await new Promise((resolve, reject) => {
-      const server = net.createServer();
-      server.listen(0, '127.0.0.1', () => {
-        const address = server.address();
-        server.close(() => {
-          if (address && typeof address === 'object') {
-            resolve(address.port);
-          } else {
-            reject(new Error('failed to resolve free port'));
-          }
-        });
-      });
-      server.on('error', reject);
-    });
+    port = await getFreePort();
     baseURL = `http://127.0.0.1:${port}`;
 
     serverProcess = spawn('tsx', ['scripts/e2e-server.ts'], {
@@ -98,5 +85,58 @@ test.describe('danmu disabled', () => {
     await page.setInputFiles('#fileInput', fixturePath);
     await page.click('#uploadBtn');
     await expect(page.locator('#successState')).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('uploads disabled', () => {
+  let port: number;
+  let baseURL: string;
+  let serverProcess: ChildProcess;
+
+  test.beforeAll(async () => {
+    port = await getFreePort();
+    baseURL = `http://127.0.0.1:${port}`;
+
+    serverProcess = spawn('tsx', ['scripts/e2e-server.ts'], {
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        GALLERY_PORT: String(port),
+        GALLERY_DANMU_ENABLED: '1',
+        GALLERY_APPROVALS_ENABLED: '0',
+        GALLERY_UPLOADS_ENABLED: '0',
+        GALLERY_WORKDIR: path.join(process.cwd(), '.e2e-workdir', 'uploads-off-upload'),
+      },
+    });
+    await waitForServer(`${baseURL}/slideshow`);
+  });
+
+  test.afterAll(() => {
+    if (serverProcess && !serverProcess.killed) {
+      serverProcess.kill('SIGTERM');
+    }
+  });
+
+  test('upload form hidden, comments visible', async ({ page }) => {
+    await page.goto(`${baseURL}/`);
+    await expect(page).toHaveTitle(/Upload Media/);
+    await expect(page.locator('#uploadForm')).toHaveCount(0);
+    await expect(page.locator('#progressWrapper')).toHaveCount(0);
+    await expect(page.locator('#successState')).toHaveCount(0);
+    await expect(page.locator('#commentForm')).toBeVisible();
+  });
+
+  test('upload endpoint is not available', async ({ request }) => {
+    const buffer = fs.readFileSync(fixturePath);
+    const uploadRes = await request.post(`${baseURL}/upload`, {
+      multipart: {
+        picture: {
+          name: 'sample.png',
+          mimeType: 'image/png',
+          buffer,
+        },
+      },
+    });
+    expect(uploadRes.status()).toBe(404);
   });
 });

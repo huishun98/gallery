@@ -62,6 +62,7 @@ func TestPromptUserInputsDefaults(t *testing.T) {
 		assert.Equal(t, "admin", got.Admin["admin"])
 		assert.False(t, got.ApprovalsEnabled)
 		assert.True(t, got.DanmuEnabled)
+		assert.True(t, got.UploadsEnabled)
 	})
 }
 
@@ -70,7 +71,7 @@ func TestPromptUserInputsCustomDefaults(t *testing.T) {
 	defaultDir := filepath.Join(tmp, "default")
 	customDir := filepath.Join(tmp, "custom")
 
-	withPtyStdin(t, "n\n9090\n"+customDir+"\nn\nn\n\n\n", func() {
+	withPtyStdin(t, "n\n9090\n"+customDir+"\ny\nn\nn\n\n\n", func() {
 		got, err := promptUserInputs(defaultDir)
 		assert.NoError(t, err)
 		assert.NotNil(t, got)
@@ -79,10 +80,43 @@ func TestPromptUserInputsCustomDefaults(t *testing.T) {
 		assert.Equal(t, "admin", got.Admin["admin"])
 		assert.False(t, got.ApprovalsEnabled)
 		assert.False(t, got.DanmuEnabled)
+		assert.True(t, got.UploadsEnabled)
 
 		_, statErr := os.Stat(customDir)
 		assert.NoError(t, statErr)
 	})
+}
+
+func TestPromptUserInputsUploadsDisabledForcesDanmu(t *testing.T) {
+	tmp := t.TempDir()
+	defaultDir := filepath.Join(tmp, "default")
+
+	withPtyStdin(t, "n\n\n\nn\n\n\n", func() {
+		got, err := promptUserInputs(defaultDir)
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+		assert.False(t, got.UploadsEnabled)
+		assert.True(t, got.DanmuEnabled)
+		assert.False(t, got.ApprovalsEnabled)
+	})
+}
+
+func TestCreateMediaDirsApprovalsDisabled(t *testing.T) {
+	tmp := t.TempDir()
+	err := createMediaDirs(tmp, true, false)
+	assert.NoError(t, err)
+	assert.DirExists(t, filepath.Join(tmp, "media", "media"))
+	assert.NoDirExists(t, filepath.Join(tmp, "media", "pending"))
+	assert.NoDirExists(t, filepath.Join(tmp, "media", "rejected"))
+}
+
+func TestCreateMediaDirsApprovalsEnabled(t *testing.T) {
+	tmp := t.TempDir()
+	err := createMediaDirs(tmp, true, true)
+	assert.NoError(t, err)
+	assert.DirExists(t, filepath.Join(tmp, "media", "media"))
+	assert.DirExists(t, filepath.Join(tmp, "media", "pending"))
+	assert.DirExists(t, filepath.Join(tmp, "media", "rejected"))
 }
 
 // Helpers

@@ -5,8 +5,9 @@ import { join, resolve } from 'node:path';
 const port = process.env.GALLERY_PORT ?? '8000';
 const danmuEnabled = process.env.GALLERY_DANMU_ENABLED !== '0';
 const approvalsEnabled = process.env.GALLERY_APPROVALS_ENABLED === '1';
+const uploadsEnabled = process.env.GALLERY_UPLOADS_ENABLED !== '0';
 const repoRoot = resolve(process.cwd());
-const workDir = process.env.GALLERY_WORKDIR ?? repoRoot;
+const workDir = process.env.GALLERY_WORKDIR ?? join(repoRoot, '.e2e-workdir', 'default');
 const dataDir = join(workDir, '.data');
 if (!existsSync(workDir)) {
   mkdirSync(workDir, { recursive: true });
@@ -31,6 +32,7 @@ const settings = {
   port,
   danmu_enabled: danmuEnabled,
   approvals_enabled: approvalsEnabled,
+  uploads_enabled: uploadsEnabled,
 };
 writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 
