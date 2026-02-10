@@ -36,9 +36,9 @@ const settings = {
 };
 writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 
-const child = spawn('go', ['run', repoRoot], {
+const child = spawn('go', ['run', repoRoot, '--debug'], {
   stdio: 'inherit',
-  env: { ...process.env, DISABLE_TUNNEL: '1' },
+  env: { ...process.env },
   cwd: workDir,
 });
 

@@ -56,6 +56,34 @@ test('admin comments download and delete work', async ({ request }) => {
   expect(listBody.total).toBe(0);
 });
 
+test('admin comments refills page after delete when more pages exist', async ({ browser, request }) => {
+  const baseURL = test.info().project.use.baseURL as string;
+  const total = 21;
+  for (let i = 0; i < total; i += 1) {
+    const filename = `comment-page-${Date.now()}-${i}.jpg`;
+    const createRes = await request.post('/comment', {
+      form: { filename, comment: `seed ${i}` },
+    });
+    expect(createRes.status()).toBe(200);
+  }
+
+  const context = await browser.newContext({
+    baseURL,
+    httpCredentials: { username: 'admin', password: 'admin' },
+  });
+  const page = await context.newPage();
+  page.on('dialog', (dialog) => dialog.accept());
+
+  await page.goto('/admin/comments');
+  const cards = page.locator('#results > div');
+  await expect(cards).toHaveCount(10);
+
+  await page.locator('#results button', { hasText: 'Delete' }).first().click();
+  await expect(cards).toHaveCount(10);
+
+  await context.close();
+});
+
 test('admin comments not available when danmu disabled', async ({ request }) => {
   const port = await getFreePort();
   const baseURL = `http://127.0.0.1:${port}`;

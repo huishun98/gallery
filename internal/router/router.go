@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"gallery/internal/handlers"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +22,7 @@ func SetupRoutes(r *gin.Engine, db *sql.DB, dataDir string, adminAccount gin.Acc
 		"ApprovalsEnabled": approvalsEnabled,
 		"UploadsEnabled":   uploadsEnabled,
 		"MediaDir":         approvedDir,
+		"Year":             time.Now().Year(),
 	}
 
 	var admin *gin.RouterGroup

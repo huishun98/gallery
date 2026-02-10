@@ -48,6 +48,11 @@
                     class="px-3 py-1 rounded border border-gray-200 hover:border-gray-400">Next</button>
             </div>
         </div>
+        <footer class="mt-8 text-center text-xs text-gray-400">
+            <a href="https://huishun98.github.io/" class="hover:text-gray-600" target="_blank" rel="noopener">
+                © {{.Year}} Hui Shun
+            </a>
+        </footer>
     </div>
 
     <script>
@@ -66,6 +71,8 @@
         let currentPage = 1;
         const pageSize = 10;
         let totalPages = 1;
+        // Track the dataset size locally so deletes can keep pagination accurate.
+        let totalCount = 0;
 
         const renderComments = (payload) => {
             results.innerHTML = "";
@@ -79,7 +86,8 @@
 
             paginationTop.classList.remove("hidden");
             paginationBottom.classList.remove("hidden");
-            totalPages = Math.max(1, Math.ceil((payload.total || 0) / pageSize));
+            totalCount = payload.total || 0;
+            totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
             pageInfoTop.innerText = `Page ${payload.page} of ${totalPages}`;
             pageInfoBottom.innerText = `Page ${payload.page} of ${totalPages}`;
             prevBtnTop.disabled = payload.page <= 1;
@@ -154,13 +162,29 @@
 
                         card.remove();
                         const remaining = results.querySelectorAll("div.border").length;
-                        if (remaining === 0 && payload.total > 1 && currentPage > 1) {
-                            currentPage -= 1;
+                        totalCount = Math.max(0, totalCount - 1);
+                        totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+                        // If the last page disappears, move to the new last page.
+                        if (currentPage > totalPages) {
+                            currentPage = totalPages;
+                        }
+                        // Refetch when the page is short and there are more pages to pull from.
+                        if (remaining < pageSize && currentPage < totalPages) {
                             await fetchComments();
                             return;
                         }
+                        pageInfoTop.innerText = `Page ${currentPage} of ${totalPages}`;
+                        pageInfoBottom.innerText = `Page ${currentPage} of ${totalPages}`;
+                        prevBtnTop.disabled = currentPage <= 1;
+                        nextBtnTop.disabled = currentPage >= totalPages;
+                        prevBtnBottom.disabled = currentPage <= 1;
+                        nextBtnBottom.disabled = currentPage >= totalPages;
+                        prevBtnTop.classList.toggle("opacity-50", prevBtnTop.disabled);
+                        nextBtnTop.classList.toggle("opacity-50", nextBtnTop.disabled);
+                        prevBtnBottom.classList.toggle("opacity-50", prevBtnBottom.disabled);
+                        nextBtnBottom.classList.toggle("opacity-50", nextBtnBottom.disabled);
                         status.innerText = remaining
-                            ? `Showing ${remaining} comment(s) on this page.`
+                            ? `Showing ${remaining} of ${totalCount} comment(s).`
                             : "No comments on this page.";
                     } catch (err) {
                         status.className = "text-xs text-red-600 mt-4";

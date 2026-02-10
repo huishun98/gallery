@@ -103,6 +103,11 @@ sudo apt install cloudflared ffmpeg
 go run main.go
 ```
 
+To run locally without opening a Cloudflare tunnel:
+```bash
+go run main.go --debug
+```
+
 ## Admin mode (basic auth)
 Admin mode adds a basic-auth protected review queue. Uploads go to `media/pending` instead of the slideshow, and an admin approves or rejects each item from `/admin/review`. Approved files move into `media/media` and appear in the slideshow; rejected files move to `media/rejected`.
 

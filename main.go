@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"flag"
 	"fmt"
 	"gallery/internal/handlers"
 	"gallery/internal/logger"
@@ -157,7 +158,7 @@ func createMediaDirs(dataDir string, uploadsEnabled, approvalsEnabled bool) erro
 	return nil
 }
 
-func run(log *logrus.Logger) error {
+func run(log *logrus.Logger, debug bool) error {
 	// Force Gin into release mode before engine init
 	gin.SetMode(gin.ReleaseMode)
 
@@ -195,7 +196,7 @@ func run(log *logrus.Logger) error {
 			return fmt.Errorf("failed to save setting: %w", err)
 		}
 	}
-	config.TunnelDisabled = os.Getenv("DISABLE_TUNNEL") != ""
+	config.TunnelDisabled = debug
 
 	// Initialize database
 	dbPath := filepath.Join(config.DataDir, "app.db")
@@ -269,8 +270,11 @@ func run(log *logrus.Logger) error {
 }
 
 func main() {
+	debug := flag.Bool("debug", false, "Disable the Cloudflare tunnel and run in debug mode")
+	flag.Parse()
+
 	log := logger.New()
-	if err := run(log); err != nil {
+	if err := run(log, *debug); err != nil {
 		log.Error(err)
 		if term.IsTerminal(int(os.Stdin.Fd())) {
 			fmt.Println("Press Enter to exit...")
